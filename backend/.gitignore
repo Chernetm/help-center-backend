@@ -1,0 +1,12 @@
+
+*.json
+!package.json
+
+
+*.env
+cmd/server/.env
+
+# Go
+vendor/
+bin/
+ 
