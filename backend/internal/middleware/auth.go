@@ -201,7 +201,7 @@ func SuperAdminMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		if role != "super-admin" {
+		if role != "super_admin" {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied: Super Admin only"})
 			c.Abort()
 			return

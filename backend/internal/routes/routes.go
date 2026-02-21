@@ -38,7 +38,7 @@ func SetupRoutes(r *gin.Engine,
 	{
 		// Admin/Agent Login/Register
 		public.POST("/admin/login", adminH.Login)
-		public.POST("/admin/register", adminH.Register) // Maybe restricted? Keeping public for demo.
+		// public.POST("/admin/register", adminH.Register) // Moved to superAdmin group for security
 
 		// Customer Login/Register
 		public.POST("/customer/login", customerH.Login)
@@ -78,8 +78,9 @@ func SetupRoutes(r *gin.Engine,
 
 		// Users (Admin Management) & Performance - Super Admin Only
 		superAdmin := adminRoutes.Group("/super")
-		// superAdmin.Use(middleware.SuperAdminMiddleware())
+		superAdmin.Use(middleware.SuperAdminMiddleware())
 		{
+			superAdmin.POST("/register", adminH.Register) // Restricted registration
 			superAdmin.GET("/users", adminH.ListAdmins)
 			superAdmin.DELETE("/users/:uid", adminH.DeleteAdmin)
 			superAdmin.PUT("/users/:uid", adminH.UpdateAdmin)

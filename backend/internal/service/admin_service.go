@@ -79,7 +79,7 @@ func (s *adminService) RegisterAdmin(req *models.RegisterRequest) (*models.UserP
 		PhoneNumber: req.PhoneNumber,
 		Address:     req.Address,
 		Image:       req.Image,
-		Role:        "super-admin", // Default role for first admin; in real app, consider role assignment logic
+		Role:        "super_admin", // Default role for first admin; in real app, consider role assignment logic
 		Department:  "",
 		IsOnline:    false,
 		// Password is not stored locally
