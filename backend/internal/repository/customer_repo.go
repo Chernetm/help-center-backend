@@ -56,7 +56,8 @@ func (r *customerRepository) FindByID(id uint) (*models.Customer, error) {
 
 func (r *customerRepository) FindAll() ([]models.Customer, error) {
 	var customers []models.Customer
-	if err := r.db.Find(&customers).Error; err != nil {
+	// Use a subquery to calculate ticket count for each customer
+	if err := r.db.Select("customers.*, (SELECT count(*) FROM tickets WHERE tickets.customer_id = customers.id) as ticket_count").Find(&customers).Error; err != nil {
 		return nil, err
 	}
 	return customers, nil

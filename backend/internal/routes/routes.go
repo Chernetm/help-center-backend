@@ -44,6 +44,10 @@ func SetupRoutes(r *gin.Engine,
 		public.POST("/customer/login", customerH.Login)
 		public.POST("/customer/register", customerH.Create)
 		public.GET("/cases", caseH.GetCases) // Public case listing
+
+		// Forgot Password
+		public.POST("/admin/forgot-password", adminH.ForgotPassword)
+		public.POST("/customer/forgot-password", customerH.ForgotPassword)
 	}
 
 	// 2. ADMIN ROUTES (AdminMiddleware)
@@ -55,6 +59,7 @@ func SetupRoutes(r *gin.Engine,
 		// Profile
 		adminRoutes.GET("/profile", adminH.GetProfile)
 		adminRoutes.PUT("/", adminH.UpdateProfile) // PUT /api/admin/
+		adminRoutes.POST("/change-password", adminH.ChangePassword)
 
 		// Orders
 		adminRoutes.POST("/orders", orderH.CreateOrder)
@@ -153,8 +158,10 @@ func SetupRoutes(r *gin.Engine,
 		// Chat
 		customerRoutes.POST("/chat/message", chatH.SendMessage)
 		customerRoutes.GET("/chat/history/:ticketId", chatH.GetHistory)
+		customerRoutes.POST("/change-password", customerH.ChangePassword)
 	}
 
 	// Move Admin-like Customer ops to Admin
 	adminRoutes.GET("/customers", customerH.ListCustomers)
+	adminRoutes.PATCH("/customers/:id/status", customerH.UpdateStatus)
 }

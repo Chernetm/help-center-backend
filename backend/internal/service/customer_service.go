@@ -26,6 +26,8 @@ type CustomerService interface {
 	UpdateCustomerRole(id uint, role string) error
 	DeleteCustomer(id uint) error
 	SyncFirebaseUser(uid, email, name string) (*models.Customer, error)
+	ForgotPassword(email string) error
+	ChangePassword(uid string, newPassword string) error
 }
 
 type customerService struct {
@@ -194,4 +196,55 @@ func (s *customerService) SyncFirebaseUser(uid, email, name string) (*models.Cus
 	}
 
 	return customer, nil
+}
+
+func (s *customerService) ForgotPassword(email string) error {
+	url := "https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=" + s.cfg.FirebaseAPIKey
+
+	payload := map[string]interface{}{
+		"email":       email,
+		"requestType": "PASSWORD_RESET",
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		json.NewDecoder(resp.Body).Decode(&errResp)
+		return fmt.Errorf("firebase error: %s", errResp.Error.Message)
+	}
+
+	return nil
+}
+
+func (s *customerService) ChangePassword(uid string, newPassword string) error {
+	ctx := context.Background()
+	params := (&auth.UserToUpdate{}).
+		Password(newPassword)
+
+	_, err := s.firebase.AuthClient.UpdateUser(ctx, uid, params)
+	if err != nil {
+		return fmt.Errorf("failed to update password in firebase: %v", err)
+	}
+
+	return nil
 }

@@ -173,3 +173,43 @@ func (h *CustomerHandler) UpdateRole(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Role updated successfully", "role": req.Role})
 }
+
+func (h *CustomerHandler) ForgotPassword(c *gin.Context) {
+	var req struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email"})
+		return
+	}
+
+	if err := h.service.ForgotPassword(req.Email); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent"})
+}
+
+func (h *CustomerHandler) ChangePassword(c *gin.Context) {
+	uid, exists := c.Get("uid")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req struct {
+		NewPassword string `json:"newPassword" binding:"required,min=6"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.service.ChangePassword(uid.(string), req.NewPassword); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
+}

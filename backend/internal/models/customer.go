@@ -9,6 +9,7 @@ type Customer struct {
 	Email       string `gorm:"size:191;unique" json:"email"`
 	Status      string `gorm:"size:20;default:'active'" json:"status"`          // active, inactive, blocked
 	Role        string `gorm:"size:20;default:'customer';not null" json:"role"` // customer, admin?? Wait user said "role status change separetely". Assuming Customer has a Role too or user implies generic Role. But models.Customer is likely just customer type. Wait. Models.Admin exists separately.
+	TicketCount int64  `gorm:"->;" json:"ticketCount"`                          // Read-only calculated field
 }
 type CustomerRegisterRequest struct {
 	Name        string `json:"name" binding:"required,min=2,max=191"`
