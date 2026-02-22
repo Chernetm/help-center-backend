@@ -27,6 +27,8 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	var req struct {
 		OrderID       string  `json:"order_id"`
 		Status        string  `json:"status"`
+		Urgency       string  `json:"urgency"`
+		Description   string  `json:"description"`
 		EstimatedTime *string `json:"estimated_time"` // ISO string
 	}
 
@@ -77,6 +79,8 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		AdminID:       adminID,
 		Department:    department,
 		Status:        req.Status,
+		Urgency:       req.Urgency,
+		Description:   req.Description,
 		EstimatedTime: estTime,
 	}
 
@@ -103,6 +107,22 @@ func (h *OrderHandler) GetOrderById(c *gin.Context) {
 		return
 	}
 
+	c.JSON(http.StatusOK, order)
+}
+
+// =====================
+// TRACK ORDER (PUBLIC)
+// =====================
+func (h *OrderHandler) TrackOrder(c *gin.Context) {
+	orderID := c.Param("id")
+
+	order, err := h.service.GetOrderByBusinessID(orderID)
+	if err != nil || order == nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "order not found"})
+		return
+	}
+
+	// Returning sanitized order (no internal IDs needed for tracking usually, but we keep structure)
 	c.JSON(http.StatusOK, order)
 }
 
@@ -158,6 +178,8 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 	var req struct {
 		Status        string  `json:"status"`
 		Department    string  `json:"department"`
+		Urgency       string  `json:"urgency"`
+		Description   string  `json:"description"`
 		BranchName    *string `json:"branch_name"`
 		EstimatedTime *string `json:"estimated_time"`
 	}
@@ -177,10 +199,20 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 		estTime = &parsed
 	}
 
+	// ⭐️ Get department from middleware if not provided or to enforce it
+	deptVal, exists := c.Get("department")
+	if exists {
+		if dept, ok := deptVal.(string); ok && dept != "" {
+			req.Department = dept // Use department from middleware
+		}
+	}
+
 	updatedOrder, err := h.service.UpdateOrder(
 		id,
 		req.Status,
 		req.Department,
+		req.Urgency,
+		req.Description,
 		req.BranchName,
 		estTime,
 	)

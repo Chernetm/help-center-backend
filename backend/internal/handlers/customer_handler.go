@@ -41,14 +41,19 @@ func (h *CustomerHandler) Login(c *gin.Context) {
 		return
 	}
 
-	customer, token, err := h.service.Login(req.Email, req.Password)
+	customer, token, refreshToken, expiresIn, err := h.service.Login(req.Email, req.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Set cookie for customer
+	c.SetCookie("customer_token", token, expiresIn, "/", "", false, true)
+
 	c.JSON(http.StatusOK, gin.H{
-		"token": token,
+		"token":        token,
+		"refreshToken": refreshToken,
+		"expiresIn":    expiresIn,
 		"user": gin.H{
 			"uid":         customer.UID,
 			"id":          customer.ID,
@@ -58,6 +63,30 @@ func (h *CustomerHandler) Login(c *gin.Context) {
 			"phoneNumber": customer.PhoneNumber,
 			"status":      customer.Status,
 		},
+	})
+}
+
+func (h *CustomerHandler) RefreshToken(c *gin.Context) {
+	var req struct {
+		RefreshToken string `json:"refreshToken" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "refreshToken is required"})
+		return
+	}
+
+	idToken, refreshToken, expiresIn, err := h.service.RefreshToken(req.RefreshToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.SetCookie("customer_token", idToken, expiresIn, "/", "", false, true)
+
+	c.JSON(http.StatusOK, gin.H{
+		"token":        idToken,
+		"refreshToken": refreshToken,
+		"expiresIn":    expiresIn,
 	})
 }
 

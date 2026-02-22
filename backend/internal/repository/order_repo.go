@@ -11,6 +11,7 @@ import (
 type OrderRepository interface {
 	Create(order *models.Order) error
 	FindByID(id string) (*models.Order, error)
+	FindByOrderID(orderID string) (*models.Order, error)
 	FindByAdminID(adminID uint64) ([]models.Order, error)
 	FindAll(filter map[string]interface{}) ([]models.Order, error)
 	Update(order *models.Order) error
@@ -33,6 +34,16 @@ func (r *orderRepository) FindByID(id string) (*models.Order, error) {
 	var order models.Order
 
 	if err := r.db.First(&order, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+
+	return &order, nil
+}
+
+func (r *orderRepository) FindByOrderID(orderID string) (*models.Order, error) {
+	var order models.Order
+
+	if err := r.db.First(&order, "order_id = ?", orderID).Error; err != nil {
 		return nil, err
 	}
 

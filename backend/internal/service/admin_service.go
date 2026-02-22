@@ -17,7 +17,8 @@ import (
 
 type AdminService interface {
 	RegisterAdmin(req *models.RegisterRequest) (*models.UserProfileResponse, error)
-	Login(email, password string) (*models.UserProfileLocal, string, error)
+	Login(email, password string) (*models.UserProfileLocal, string, string, int, error)
+	RefreshToken(refreshToken string) (string, string, int, error)
 	GetProfileByUID(uid string) (*models.UserProfileResponse, error)
 	UpdateProfile(uid string, req *models.RegisterRequest) (*models.UserProfileResponse, error)
 	VerifyIDToken(token string) (*auth.Token, error)
@@ -79,10 +80,14 @@ func (s *adminService) RegisterAdmin(req *models.RegisterRequest) (*models.UserP
 		PhoneNumber: req.PhoneNumber,
 		Address:     req.Address,
 		Image:       req.Image,
-		Role:        "super_admin", // Default role for first admin; in real app, consider role assignment logic
-		Department:  "",
+		Role:        req.Role,
+		Department:  req.Department,
 		IsOnline:    false,
 		// Password is not stored locally
+	}
+
+	if admin.Role == "" {
+		admin.Role = "admin"
 	}
 
 	// Ensure username is set if required by DB constraint
@@ -95,18 +100,22 @@ func (s *adminService) RegisterAdmin(req *models.RegisterRequest) (*models.UserP
 
 	// 3. Return response
 	response := &models.UserProfileResponse{
+		ID:          admin.ID,
 		UID:         userRecord.UID,
 		Email:       admin.Email,
 		FirstName:   admin.FirstName,
 		LastName:    admin.LastName,
 		PhoneNumber: admin.PhoneNumber,
 		Address:     admin.Address,
+		Role:        admin.Role,
+		Department:  admin.Department,
+		Image:       admin.Image,
 	}
 
 	return response, nil
 }
 
-func (s *adminService) Login(email, password string) (*models.UserProfileLocal, string, error) {
+func (s *adminService) Login(email, password string) (*models.UserProfileLocal, string, string, int, error) {
 	url := "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + s.cfg.FirebaseAPIKey
 
 	payload := map[string]interface{}{
@@ -117,18 +126,18 @@ func (s *adminService) Login(email, password string) (*models.UserProfileLocal, 
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", 0, err
 	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", 0, err
 	}
 	defer resp.Body.Close()
 
@@ -141,7 +150,7 @@ func (s *adminService) Login(email, password string) (*models.UserProfileLocal, 
 		}
 		json.NewDecoder(resp.Body).Decode(&errResp)
 
-		return nil, "", fmt.Errorf(
+		return nil, "", "", 0, fmt.Errorf(
 			"firebase auth failed (%d): %s",
 			resp.StatusCode,
 			errResp.Error.Message,
@@ -150,18 +159,23 @@ func (s *adminService) Login(email, password string) (*models.UserProfileLocal, 
 
 	// Parse Firebase response
 	var result struct {
-		IDToken string `json:"idToken"`
-		LocalID string `json:"localId"`
-		Email   string `json:"email"`
+		IDToken      string `json:"idToken"`
+		RefreshToken string `json:"refreshToken"`
+		ExpiresIn    string `json:"expiresIn"` // number of seconds as string
+		LocalID      string `json:"localId"`
+		Email        string `json:"email"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, "", err
+		return nil, "", "", 0, err
 	}
+
+	expiresIn := 3600 // Default 1 hour
+	fmt.Sscanf(result.ExpiresIn, "%d", &expiresIn)
 
 	// Lookup user in DB
 	admin, err := s.repo.FindByEmail(result.Email)
 	if err != nil {
-		return nil, "", errors.New("admin profile not found locally")
+		return nil, "", "", 0, errors.New("admin profile not found locally")
 	}
 
 	userProfile := &models.UserProfileLocal{
@@ -173,9 +187,41 @@ func (s *adminService) Login(email, password string) (*models.UserProfileLocal, 
 		Role:        admin.Role,
 		PhoneNumber: admin.PhoneNumber,
 		Address:     admin.Address,
+		Department:  admin.Department,
+		Image:       admin.Image,
 	}
 
-	return userProfile, result.IDToken, nil
+	return userProfile, result.IDToken, result.RefreshToken, expiresIn, nil
+}
+
+func (s *adminService) RefreshToken(refreshToken string) (string, string, int, error) {
+	url := "https://securetoken.googleapis.com/v1/token?key=" + s.cfg.FirebaseAPIKey
+
+	payload := fmt.Sprintf("grant_type=refresh_token&refresh_token=%s", refreshToken)
+
+	resp, err := http.Post(url, "application/x-www-form-urlencoded", bytes.NewBufferString(payload))
+	if err != nil {
+		return "", "", 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", "", 0, errors.New("failed to refresh token")
+	}
+
+	var result struct {
+		IDToken      string `json:"id_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    string `json:"expires_in"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", "", 0, err
+	}
+
+	expiresIn := 3600
+	fmt.Sscanf(result.ExpiresIn, "%d", &expiresIn)
+
+	return result.IDToken, result.RefreshToken, expiresIn, nil
 }
 
 func (s *adminService) GetProfileByUID(uid string) (*models.UserProfileResponse, error) {
@@ -193,6 +239,8 @@ func (s *adminService) GetProfileByUID(uid string) (*models.UserProfileResponse,
 		Role:        admin.Role,
 		PhoneNumber: admin.PhoneNumber,
 		Address:     admin.Address,
+		Department:  admin.Department,
+		Image:       admin.Image,
 	}
 	return response, nil
 }

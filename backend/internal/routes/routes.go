@@ -48,6 +48,13 @@ func SetupRoutes(r *gin.Engine,
 		// Forgot Password
 		public.POST("/admin/forgot-password", adminH.ForgotPassword)
 		public.POST("/customer/forgot-password", customerH.ForgotPassword)
+
+		// Token Refresh
+		public.POST("/auth/admin/refresh", adminH.RefreshToken)
+		public.POST("/auth/customer/refresh", customerH.RefreshToken)
+
+		// Public Order Tracking
+		public.GET("/orders/:id", orderH.TrackOrder)
 	}
 
 	// 2. ADMIN ROUTES (AdminMiddleware)

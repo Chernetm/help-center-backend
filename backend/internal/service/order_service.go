@@ -10,9 +10,10 @@ import (
 type OrderService interface {
 	CreateOrder(order *models.Order) error
 	GetOrder(id string) (*models.Order, error)
+	GetOrderByBusinessID(orderID string) (*models.Order, error)
 	GetOrdersByAdmin(adminID uint64) ([]models.Order, error)
 	ListOrders(status, department string) ([]models.Order, error)
-	UpdateOrder(id string, status, department string, branchName *string, estTime *time.Time) (*models.Order, error)
+	UpdateOrder(id string, status, department, urgency, description string, branchName *string, estTime *time.Time) (*models.Order, error)
 	DeleteOrder(id string) error
 }
 
@@ -42,6 +43,10 @@ func (s *orderService) GetOrder(id string) (*models.Order, error) {
 	return s.repo.FindByID(id)
 }
 
+func (s *orderService) GetOrderByBusinessID(orderID string) (*models.Order, error) {
+	return s.repo.FindByOrderID(orderID)
+}
+
 func (s *orderService) GetOrdersByAdmin(adminID uint64) ([]models.Order, error) {
 	return s.repo.FindByAdminID(adminID)
 }
@@ -64,6 +69,8 @@ func (s *orderService) UpdateOrder(
 	id string,
 	status string,
 	department string,
+	urgency string,
+	description string,
 	branchName *string,
 	estTime *time.Time,
 ) (*models.Order, error) {
@@ -80,6 +87,14 @@ func (s *orderService) UpdateOrder(
 
 	if department != "" {
 		order.Department = department
+	}
+
+	if urgency != "" {
+		order.Urgency = urgency
+	}
+
+	if description != "" {
+		order.Description = description
 	}
 
 	// Nullable field handling

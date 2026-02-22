@@ -16,7 +16,8 @@ import (
 
 type CustomerService interface {
 	RegisterCustomer(req *models.CustomerRegisterRequest) (*models.Customer, error)
-	Login(email, password string) (*models.Customer, string, error)
+	Login(email, password string) (*models.Customer, string, string, int, error)
+	RefreshToken(refreshToken string) (string, string, int, error)
 	GetCustomerByEmail(email string) (*models.Customer, error)
 	GetCustomerByUID(uid string) (*models.Customer, error)
 	GetCustomerByID(id uint) (*models.Customer, error)
@@ -96,7 +97,7 @@ func (s *customerService) RegisterCustomer(req *models.CustomerRegisterRequest) 
 	return customer, nil
 }
 
-func (s *customerService) Login(email, password string) (*models.Customer, string, error) {
+func (s *customerService) Login(email, password string) (*models.Customer, string, string, int, error) {
 	url := "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + s.cfg.FirebaseAPIKey
 
 	payload := map[string]interface{}{
@@ -107,39 +108,74 @@ func (s *customerService) Login(email, password string) (*models.Customer, strin
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", 0, err
 	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", 0, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, "", errors.New("firebase auth failed")
+		return nil, "", "", 0, errors.New("firebase auth failed")
 	}
 
 	var result struct {
-		IDToken string `json:"idToken"`
-		Email   string `json:"email"`
+		IDToken      string `json:"idToken"`
+		RefreshToken string `json:"refreshToken"`
+		ExpiresIn    string `json:"expiresIn"`
+		Email        string `json:"email"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, "", err
+		return nil, "", "", 0, err
 	}
+
+	expiresIn := 3600
+	fmt.Sscanf(result.ExpiresIn, "%d", &expiresIn)
 
 	customer, err := s.repo.FindByEmail(result.Email)
 	if err != nil {
-		return nil, "", errors.New("customer profile not found locally")
+		return nil, "", "", 0, errors.New("customer profile not found locally")
 	}
 
-	return customer, result.IDToken, nil
+	return customer, result.IDToken, result.RefreshToken, expiresIn, nil
+}
+
+func (s *customerService) RefreshToken(refreshToken string) (string, string, int, error) {
+	url := "https://securetoken.googleapis.com/v1/token?key=" + s.cfg.FirebaseAPIKey
+
+	payload := fmt.Sprintf("grant_type=refresh_token&refresh_token=%s", refreshToken)
+
+	resp, err := http.Post(url, "application/x-www-form-urlencoded", bytes.NewBufferString(payload))
+	if err != nil {
+		return "", "", 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", "", 0, errors.New("failed to refresh token")
+	}
+
+	var result struct {
+		IDToken      string `json:"id_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    string `json:"expires_in"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", "", 0, err
+	}
+
+	expiresIn := 3600
+	fmt.Sscanf(result.ExpiresIn, "%d", &expiresIn)
+
+	return result.IDToken, result.RefreshToken, expiresIn, nil
 }
 
 func (s *customerService) GetCustomerByEmail(email string) (*models.Customer, error) {

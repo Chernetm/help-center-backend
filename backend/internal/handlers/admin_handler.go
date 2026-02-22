@@ -142,13 +142,14 @@ func (h *AdminHandler) Login(c *gin.Context) {
 		return
 	}
 
-	user, token, err := h.service.Login(req.Email, req.Password)
+	user, token, refreshToken, expiresIn, err := h.service.Login(req.Email, req.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	maxAge := 3600 * 24
+	// Use expiresIn for cookie maxAge
+	maxAge := expiresIn
 
 	// Set cookie with secure=false for development (should be configurable for prod)
 	// SameSite defaults to Lax/Strict behavior in modern browsers when not specified with Secure
@@ -163,13 +164,39 @@ func (h *AdminHandler) Login(c *gin.Context) {
 	)
 
 	c.JSON(http.StatusOK, gin.H{
-		"token": token,
+		"token":        token,
+		"refreshToken": refreshToken,
+		"expiresIn":    expiresIn,
 		"user": gin.H{
 			"uid":   user.UID,
 			"id":    user.ID,
 			"email": user.Email,
 			"role":  user.Role,
 		},
+	})
+}
+
+func (h *AdminHandler) RefreshToken(c *gin.Context) {
+	var req struct {
+		RefreshToken string `json:"refreshToken" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "refreshToken is required"})
+		return
+	}
+
+	idToken, refreshToken, expiresIn, err := h.service.RefreshToken(req.RefreshToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.SetCookie("admin_token", idToken, expiresIn, "/", "", false, true)
+
+	c.JSON(http.StatusOK, gin.H{
+		"token":        idToken,
+		"refreshToken": refreshToken,
+		"expiresIn":    expiresIn,
 	})
 }
 
