@@ -83,7 +83,7 @@ func (r *adminRepository) FindAvailableAgent(department string) (*models.Admin, 
 	var agent models.Admin
 	// Find agent with role='agent', isOnline=true, department=selectedCase.department
 	// Order by activeTicketQty asc
-	err := r.db.Where("role = ? AND is_online = ? AND department = ?", "admin", false, department).
+	err := r.db.Where("role IN ? AND is_online = ? AND department = ?", []string{"admin", "agent"}, true, department).
 		Order("active_ticket_qty asc").
 		First(&agent).Error
 	if err != nil {
@@ -105,7 +105,7 @@ func (r *adminRepository) FindAgentsFullDetails() ([]models.Admin, error) {
 		Preload("Tickets.Ratings", func(db *gorm.DB) *gorm.DB {
 			return db.Select("ticket_id", "score")
 		}).
-		Where("role = ?", "admin"). // Adjust role if needed (e.g. "admin" vs "agent")
+		Where("role IN ?", []string{"admin", "agent"}). // Adjust role if needed (e.g. "admin" vs "agent")
 		Find(&admins).Error
 
 	return admins, err

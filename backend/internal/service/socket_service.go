@@ -148,7 +148,7 @@ func (s *socketService) HandleConnections(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	token, _ := r.Cookie("admin_token")
+	token, _ := r.Cookie("adminToken")
 	var tokenValue string
 	if token != nil {
 		tokenValue = token.Value
@@ -351,6 +351,13 @@ func (c *Client) handleEvent(event SocketEvent) {
 		// Join Admin specific room
 		roomName := fmt.Sprintf("admin_%d", profile.ID)
 		c.joinRoom(roomName)
+
+	case "join":
+		// Generic join room (e.g. for admin_ID fallback)
+		room, ok := event.Payload.(string)
+		if ok && room != "" {
+			c.joinRoom(room)
+		}
 
 	default:
 		log.Println("WS: Unknown event type:", event.Type)
