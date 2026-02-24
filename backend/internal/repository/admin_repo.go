@@ -83,7 +83,7 @@ func (r *adminRepository) FindAvailableAgent(department string) (*models.Admin, 
 	var agent models.Admin
 	// Find agent with role='agent', isOnline=true, department=selectedCase.department
 	// Order by activeTicketQty asc
-	err := r.db.Where("role IN ? AND is_online = ? AND department = ?", []string{"admin", "agent"}, true, department).
+	err := r.db.Where("role = ? AND status = ? AND department = ?", "admin", "Active", department).
 		Order("active_ticket_qty asc").
 		First(&agent).Error
 	if err != nil {
