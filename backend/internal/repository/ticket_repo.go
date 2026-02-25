@@ -15,6 +15,7 @@ type TicketRepository interface {
 	FindActiveTicket(customerID uint, caseID uint) (*models.Ticket, error)
 	Delete(id uint) error
 	DeleteUnassignedTickets() error
+	DeleteAllTickets() error
 }
 
 type ticketRepository struct {
@@ -132,4 +133,28 @@ func (r *ticketRepository) DeleteUnassignedTickets() error {
 		}
 	}
 	return nil
+}
+func (r *ticketRepository) DeleteAllTickets() error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Delete associations first
+		if err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&models.MessageReadStatus{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&models.ChatMessage{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&models.Rating{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&models.TicketMetrics{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&models.Ticket{}).Error; err != nil {
+			return err
+		}
+
+		// Also reset agent ticket counts? User didn't ask but it's good practice.
+		// However, it's safer to just do what's asked.
+		return nil
+	})
 }

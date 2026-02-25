@@ -66,6 +66,14 @@ func main() {
 	chatService := service.NewChatService(chatRepo, ticketRepo, socketService)
 	commonService := service.NewCommonService(auditRepo, ratingRepo, sessionRepo)
 
+	// ✅ UNCOMMENT TO DELETE ALL TICKETS, CHATS, RATINGS, ETC.
+	// log.Println("🔥 BULK DELETE: Starting deletion of all tickets and associated data...")
+	// if err := ticketService.DeleteAllTickets(); err != nil {
+	// 	log.Printf("🔥 BULK DELETE ERROR: %v", err)
+	// } else {
+	// 	log.Println("🔥 BULK DELETE: Successfully cleared all ticket data.")
+	// }
+
 	// Handlers
 	adminHandler := handlers.NewAdminHandler(adminService)
 	customerHandler := handlers.NewCustomerHandler(customerService)

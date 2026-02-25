@@ -30,6 +30,7 @@ type TicketService interface {
 
 	DeleteTicket(id uint, customerID uint) error
 	CleanUnassignedTickets() error
+	DeleteAllTickets() error
 }
 
 type ticketService struct {
@@ -271,6 +272,10 @@ func (s *ticketService) DeleteTicket(id uint, customerID uint) error {
 
 func (s *ticketService) CleanUnassignedTickets() error {
 	return s.repo.DeleteUnassignedTickets()
+}
+
+func (s *ticketService) DeleteAllTickets() error {
+	return s.repo.DeleteAllTickets()
 }
 
 // package service
