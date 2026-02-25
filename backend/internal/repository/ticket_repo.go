@@ -13,6 +13,8 @@ type TicketRepository interface {
 	FindAll(filter map[string]interface{}) ([]models.Ticket, error)
 	Update(ticket *models.Ticket) error
 	FindActiveTicket(customerID uint, caseID uint) (*models.Ticket, error)
+	Delete(id uint) error
+	DeleteUnassignedTickets() error
 }
 
 type ticketRepository struct {
@@ -64,8 +66,8 @@ func (r *ticketRepository) FindAll(filter map[string]interface{}) ([]models.Tick
 		query = query.Where("status = ?", val)
 	}
 
-	// Default ordering
-	query = query.Order("created_at asc")
+	// Default ordering - Most recent update first (Telegram style)
+	query = query.Order("updated_at desc")
 
 	if err := query.Find(&tickets).Error; err != nil {
 		return nil, err
@@ -94,4 +96,40 @@ func (r *ticketRepository) FindActiveTicket(customerID uint, caseID uint) (*mode
 	}
 	fmt.Printf("FindActiveTicket: Found existing ticket ID: %d for C:%d Case:%d\n", ticket.ID, customerID, caseID)
 	return &ticket, nil
+}
+func (r *ticketRepository) Delete(id uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Delete associations first to avoid foreign key errors
+		if err := tx.Where("ticket_id = ?", id).Delete(&models.ChatMessage{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("ticket_id = ?", id).Delete(&models.Rating{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("ticket_id = ?", id).Delete(&models.TicketMetrics{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("id = ?", id).Delete(&models.Ticket{}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (r *ticketRepository) DeleteUnassignedTickets() error {
+	var tickets []models.Ticket
+	// A ticket is unassigned if AdminID is NULL
+	if err := r.db.Where("admin_id IS NULL").Find(&tickets).Error; err != nil {
+		return err
+	}
+	// if err := r.db.Unscoped().Where("1 = 1").Delete(&models.Ticket{}).Error; err != nil {
+	// 	return err
+	// }
+	for _, t := range tickets {
+		fmt.Printf("AutoCleanup: Deleting unassigned ticket ID=%d\n", t.ID)
+		if err := r.Delete(t.ID); err != nil {
+			fmt.Printf("AutoCleanup: Error deleting ticket %d: %v\n", t.ID, err)
+		}
+	}
+	return nil
 }

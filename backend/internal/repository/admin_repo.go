@@ -81,9 +81,9 @@ func (r *adminRepository) Delete(uid string) error {
 
 func (r *adminRepository) FindAvailableAgent(department string) (*models.Admin, error) {
 	var agent models.Admin
-	// Find agent with role='agent', isOnline=true, department=selectedCase.department
+	// Find agent with role in ['admin', 'agent'], status='Active', isOnline=true, department matching
 	// Order by activeTicketQty asc
-	err := r.db.Where("role = ? AND status = ? AND department = ?", "admin", "Active", department).
+	err := r.db.Where("role = ? AND status = ?  AND department = ?", "admin", "Active", department).
 		Order("active_ticket_qty asc").
 		First(&agent).Error
 	if err != nil {

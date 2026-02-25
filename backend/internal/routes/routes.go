@@ -81,6 +81,7 @@ func SetupRoutes(r *gin.Engine,
 		adminRoutes.POST("/tickets/messages", chatH.SendAgentMessage)
 		adminRoutes.GET("/tickets", ticketH.GetAgentTickets)
 		adminRoutes.PUT("/tickets/:id/close", ticketH.CloseTicket) // Added Close Ticket
+		adminRoutes.DELETE("/tickets/:id", ticketH.DeleteTicket)   // Added Delete Ticket
 		adminRoutes.PUT("/tickets/:id/read", chatH.MarkMessagesAsRead)
 
 		// Users (Admin Management) & Performance - Super Admin Only
@@ -160,6 +161,7 @@ func SetupRoutes(r *gin.Engine,
 			tickets.POST("/messages", chatH.SendCustomerMessage)
 			tickets.GET("/:id/rating", ticketH.GetRating)
 			tickets.POST("/:id/rating", ticketH.CreateRating)
+			tickets.DELETE("/:id", ticketH.DeleteTicket)
 			tickets.PUT("/:id/read", chatH.MarkMessagesAsRead)
 		}
 

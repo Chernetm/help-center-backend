@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"customer-help-center-backend/internal/config"
 	"customer-help-center-backend/internal/database"
@@ -56,8 +57,8 @@ func main() {
 	sessionRepo := repository.NewWorkSessionRepository(database.DB)
 
 	adminService := service.NewAdminService(adminRepo, sessionRepo, firebaseService, cfg)
-	socketService := service.NewSocketService(adminService)
 	customerService := service.NewCustomerService(customerRepo, firebaseService, cfg)
+	socketService := service.NewSocketService(adminService, customerService)
 	ratingService := service.NewRatingService(ratingRepo, ticketRepo)
 	ticketService := service.NewTicketService(ticketRepo, caseRepo, adminRepo, ratingRepo, chatRepo, socketService)
 	caseService := service.NewCaseService(caseRepo)
@@ -79,6 +80,7 @@ func main() {
 
 	// ⭐ GLOBAL CORS MIDDLEWARE ⭐
 	//https://selamcustomersupport.vercel.app
+	//http://localhost:5173
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "https://selamcustomersupport.vercel.app") // Adjust to your frontend URL
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -111,6 +113,24 @@ func main() {
 		adminService,
 		customerService,
 	)
+
+	// 6. Start Background Workers
+	go func() {
+		log.Println("AutoCleanup Worker: Started")
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+
+		// Run once at startup
+		if err := ticketService.CleanUnassignedTickets(); err != nil {
+			log.Printf("AutoCleanup Error: %v", err)
+		}
+
+		for range ticker.C {
+			if err := ticketService.CleanUnassignedTickets(); err != nil {
+				log.Printf("AutoCleanup Error: %v", err)
+			}
+		}
+	}()
 
 	log.Printf("Server starting on :%s", cfg.ServerPort)
 	if err := r.Run(":" + cfg.ServerPort); err != nil {

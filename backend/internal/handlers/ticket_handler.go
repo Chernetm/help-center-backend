@@ -346,3 +346,51 @@ func (h *TicketHandler) GetRating(c *gin.Context) {
 
 	c.JSON(http.StatusOK, rating)
 }
+
+func (h *TicketHandler) DeleteTicket(c *gin.Context) {
+	fmt.Println("TicketHandler.DeleteTicket called")
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	// 1. Check for Customer ID
+	var customerID uint
+	if val, exists := c.Get("customer_id"); exists {
+		if idUint, ok := val.(uint); ok {
+			customerID = idUint
+		}
+	}
+
+	// 2. Check for Admin ID (if no customer_id, it might be an admin request)
+	isAdmin := false
+	if val, exists := c.Get("admin_id"); exists {
+		if _, ok := val.(uint); ok { // Assuming admin_id is uint
+			isAdmin = true
+		} else if _, ok := val.(uint64); ok {
+			isAdmin = true
+		}
+	}
+
+	fmt.Printf("DeleteTicket Handler: ID=%d, CustomerID=%d, IsAdmin=%v\n", id, customerID, isAdmin)
+
+	// If it's not a customer and not an admin, it's unauthorized (though middleware should catch this)
+	if customerID == 0 && !isAdmin {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	if err := h.service.DeleteTicket(uint(id), customerID); err != nil {
+		fmt.Printf("DeleteTicket Service Error: %v\n", err)
+		if err.Error() == "ticket not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Ticket deleted successfully"})
+}
