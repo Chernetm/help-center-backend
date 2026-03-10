@@ -22,6 +22,7 @@ func SetupRoutes(r *gin.Engine,
 	orderH *handlers.OrderHandler,
 	chatH *handlers.ChatHandler,
 	commonH *handlers.CommonHandler,
+	externalH *handlers.ExternalHandler,
 	adminService service.AdminService,
 	customerService service.CustomerService, // Added dependency
 ) {
@@ -55,6 +56,7 @@ func SetupRoutes(r *gin.Engine,
 
 		// Public Order Tracking
 		public.GET("/orders/:id", orderH.TrackOrder)
+		public.GET("/customer/orders/external/:id", externalH.ExternalReceiptLookup)
 	}
 
 	// 2. ADMIN ROUTES (AdminMiddleware)

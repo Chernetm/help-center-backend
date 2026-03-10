@@ -82,6 +82,7 @@ func main() {
 	orderHandler := handlers.NewOrderHandler(orderService)
 	chatHandler := handlers.NewChatHandler(chatService)
 	commonHandler := handlers.NewCommonHandler(commonService)
+	externalHandler := handlers.NewExternalHandler()
 
 	// 5. Setup Router
 	r := gin.Default()
@@ -118,6 +119,7 @@ func main() {
 		orderHandler,
 		chatHandler,
 		commonHandler,
+		externalHandler,
 		adminService,
 		customerService,
 	)
